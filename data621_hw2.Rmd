@@ -1,0 +1,309 @@
+---
+title: "Data621 HW2"
+author: "Team 2"
+date: "04/03/2019"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    pdf_document: default
+    theme: cosmo
+    toc: yes
+    toc_float: yes
+---
+
+# Overview
+
+Task: Upon following the instructions below, use your created R functions and the other packages to generate the classification metrics for the provided data set. A write-up of your solutions submitted in PDF format. 
+
+## Instructions 
+
+In this homework assignment, you will work through various classification metrics. You will be asked to create functions in R to carry out the various calculations. You will also investigate some functions in packages that will let you obtain the equivalent results. Finally, you will create graphical output that also can be used to evaluate the output of classification models, such as binary logistic regression. 
+
+## Dependencies
+
+Replication of our work requires the following dependencies: 
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE, error=FALSE, comment=FALSE}
+require(caret)
+require(pROC)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, error=FALSE, comment=FALSE}
+# Requirements for formatting and augmenting default settings for chunks. 
+require(knitr)
+require(kableExtra)
+require(default)
+require(ggplot2)
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+default(kable_styling)  <- list(bootstrap_options = c("basic"), 
+                                position = "center", 
+                                full_width = TRUE,
+                                font_size = NULL)
+```
+
+# Step 1
+
+Step 1 requires us to download the classification output dataset file. We accomplished this by reading the data and converting the `scored.class` vector to a factor.
+
+```{r}
+data<-read.csv('data.csv')
+data$class<- as.factor(data$class)
+data$scored.class<- as.factor(data$scored.class)
+```
+
+# Step 2
+
+Step 2 requires us to use the `table()` function to get the raw confusion matrix for the scored dataset. The provided data set has three key columns we will use: ???
+    - `class`: the actual class for the observation ???
+    - `scored.class`: the predicted class for the observation (based on a threshold of 0.5) ???
+    - `scored.probability`: the predicted probability of success for the observation 
+
+The confusion matrix puts the measured value on x-axis and the actual value on the y-axis. The rows in the table below represent the predictions from the `scored.class` column, whereas the columns depict the actual values from the `class` variable.  
+
+In this matrix, $0$ represents measured or expected falsehood where as $1$ represents an expected/measured truth. We can see from the results that the major diagonal contains most of our data. That is, the model generally classifies things correctly. There are, however, 35 classifieds data points.
+
+```{r}
+table(data$scored.class, data$class)
+```
+
+
+# Step 3
+
+Step 3 requires us to write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions. 
+
+The function we created calculates accuracy from the confusion matrix for the `class` and `scored.class` variables. It measures the number of correct classifications and divides that sum by the total number of classifications.
+
+$${Accuracy} = \frac{TP+TN}{TP+FP+TN+FN}$$ 
+
+
+```{r}
+accuracy <- function(df) {
+mtx = table(df$class,df$scored.class)
+head(mtx)
+TN=mtx[1,1]
+FP=mtx[1,2]
+FN=mtx[2,1]
+TP=mtx[2,2]
+
+return((TP+TN)/(TP+FP+TN+FN))
+}
+```
+
+
+# Step 4
+
+Step 4 requires us to write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions. We expect both our functions for accuracy and an error rate to return a sum of one. 
+
+Below is the error rate function, which measures the incorrect classifications divided by the total.
+
+$${Classification Error Rate} = \frac{FP+FN}{TP+FP+TN+FN}$$ 
+
+```{r}
+error <- function(df) {
+mtx = table(df$class,df$scored.class)
+TN=mtx[1,1]
+FP=mtx[1,2]
+FN=mtx[2,1]
+TP=mtx[2,2]
+  
+return((FP+FN)/(TP+FP+TN+FN))
+  
+}
+```
+
+As expected, the accuracy and error rates add up to 1.
+
+```{r}
+accuracy(data) + error(data)
+```
+
+## Q5
+
+Precision is a measure of how many detected positives were correctly classified.
+
+```{r}
+precision <- function(df) {
+mtx = table(df$class,df$scored.class)
+FP=mtx[1,2]
+TP=mtx[2,2]
+
+  
+return((TP)/(TP+FP))
+  
+}
+
+```
+
+## Q6
+
+Sensitivity measures the number of true positive classifications divided by the number of positives in the population.
+
+```{r}
+sensitivity <- function(df) {
+mtx = table(df$class,df$scored.class)
+TP=mtx[2,2]
+FN=mtx[2,1]
+  
+return((TP)/(TP+FN))
+  
+}
+
+```
+
+## Q7
+
+Specificity is the negative e## Quivalent of the sensitivity in that it measures number of correctly classified negatives in relation to the total number of negatives in the classified set.
+
+```{r}
+specificity <- function(df) {
+mtx = table(df$class,df$scored.class)
+TN=mtx[1,1]
+FP=mtx[1,2]
+FN=mtx[2,1]
+TP=mtx[2,2]
+
+return((TN)/(TN+FP))
+  
+}
+```
+
+
+## Q8
+
+F1 score is a hybrid score that attempts to weigh the recall(1/specificity) and precision
+in one metric using the harmonic average. Simply put the F1 score is 
+$$
+
+F_1 = \frac{(\text{recall}^{-1} + \text{precision}^{-1})}{2}^{-1}
+
+$$
+
+```{r}
+f1 <- function(df) {
+mtx = table(df$class,df$scored.class)
+TN=mtx[1,1]
+FP=mtx[1,2]
+FN=mtx[2,1]
+TP=mtx[2,2]
+  
+return (2*TP/(2*TP+FN+FP))
+  
+}
+```
+
+## Q9
+
+$$
+F_1 = 2 \frac{\text{Precision} \cdot \text{Sensititivity}}{\text{Sensitivity} + \text{Precision}}
+$$
+Since precision and sensitivity can only be on the interval $[0,1]$ the denominator will always be at least as large as the numerator. That is to say that
+$$ a+b \geq a*b $$ when $a$, $b$ are between $[0,1]$. That means our fraction will be at most 1. However, we must also consider the 2. For that we look at the harmonic form below.
+$$
+
+F_1 = \frac{(\text{recall}^{-1} + \text{precision}^{-1})}{2}^{-1}
+
+$$
+Here it is easy to see that even if we have a large value for both precision and recall (1), the numerator can be at most 2, giving us a maximum score of 1. We can verify that with a simulation of 10000 pairs in R. 
+```{r}
+a <- runif(10000,0,1)
+b <- runif(10000,0,1)
+f.1 <- (2*a*b/(a+b))
+max(f.1)
+
+```
+
+
+## Q10
+
+```{r}
+roc <- function(df, actual, probab){
+ tr<-seq(0.01,1,0.01)
+ val_x<-vector()
+ val_y<-vector()
+ 
+ for (i in tr){
+   df["pred"]<-ifelse(df[probab]<i,0,1)
+ 
+   
+   spec <- function(df, actual, pred){
+     actual <- df[actual]
+     pred <- df[pred]
+     df_new <-  ifelse(actual==0 & pred==0, "TN",ifelse(actual==0 & pred==1, "FP",
+                                                ifelse(actual==1 & pred==0, "FN", "TP")))
+     conf <-table(df_new)
+     m_spec <- conf["TN"]/(conf["TN"]+conf["FP"])
+     return(as.numeric(m_spec))
+   }
+   
+   sens <- function(df, actual, pred){
+     actual <- df[actual]
+     pred <- df[pred]
+     df_new <-  ifelse(actual==0 & pred==0, "TN",ifelse(actual==0 & pred==1, "FP",
+                                                ifelse(actual==1 & pred==0, "FN", "TP")))
+     conf <-table(df_new)
+     m_sens <- conf["TP"]/(conf["TP"]+conf["FN"])
+     return(as.numeric(m_sens))
+}
+
+ 
+ val_x<-c(val_x, 1-spec(df, actual, "pred"))
+ val_y<-c(val_y, sens(df, actual, "pred"))
+ }
+ 
+ df_xy<-data.frame(val_x,val_y)
+ df_xy<-df_xy[complete.cases(df_xy),]
+ 
+ b<--diff(df_xy$val_x)
+ 
+ auc<-min(df_xy$val_x)*min(df_xy$val_y)/2 +
+   sum(b*df_xy$val_y[-length(df_xy$val_y)]) +
+   (1-max(df_xy$val_x))*max(df_xy$val_y)+
+   ((1-max(df_xy$val_x))*(1-max(df_xy$val_y))/2)
+ 
+ return(c(plot(val_y~val_x, df_xy, type="l",main="ROC Curve"), abline(0,1,lty=2),auc))
+ 
+}
+
+roc(df, "class","scored.probability")
+```
+
+
+
+## Q11
+Here we apply each of our functions to the provided data
+```{r}
+accuracy(data)
+sensitivity(data)
+specificity(data)
+
+error(data)
+precision(data)
+
+f1(data)
+```
+
+
+
+## Q12
+We can verify our calculations by using the ```caret``` package.
+```{r}
+cf<-confusionMatrix(data$scored.class, data$class, positive = "1")
+cf
+```
+
+
+## Q13
+
+Likewise, the pROC package can be used to verify our results from the ROC curve.
+```{r}
+roc(class ~ scored.probability, data, smooth=FALSE, plot = TRUE, print.auc=TRUE,  col="red")
+```
+
+
+
+
+
+
